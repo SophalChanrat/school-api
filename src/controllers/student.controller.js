@@ -7,6 +7,28 @@ import db from '../models/index.js';
  *   description: Student management
  */
 
+/**
+ * @swagger
+ * /Students:
+ *   post:
+ *     summary: Create a new student
+ *     tags: [Students]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, department]
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Student created
+ */
 export const createStudent = async (req, res) => {
     try {
         const student = await db.Student.create(req.body);
@@ -20,105 +42,65 @@ export const createStudent = async (req, res) => {
  * @swagger
  * /students:
  *   get:
- *     summary: Get all students (paginated)
+ *     summary: Get all students with pagination and courses
  *     tags: [Students]
  *     parameters:
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Number of students per page
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *           default: 1
  *         description: Page number
  *       - in: query
- *         name: sort
+ *         name: limit
  *         schema:
- *           type: string
- *           enum: [asc, desc]
- *           default: asc
- *         description: Sort order by student ID
- *       - in: query
- *         name: populate
- *         schema:
- *         type: string
- *         description: Whether to include related Course data(e.g. 'course')
+ *           type: integer
+ *         description: Number of records per page
  *     responses:
  *       200:
- *         description: List of students with pagination metadata
+ *         description: List of students with meta
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Student'
  *                 meta:
  *                   type: object
  *                   properties:
- *                     totalItems:
- *                       type: integer
  *                     page:
  *                       type: integer
  *                     totalPages:
  *                       type: integer
- *                 data:
- *                   type: array
- *                   items:
  */
-/**
- * Retrieves a paginated list of students from the database.
- *
- * Query Parameters:
- * @param {number} [req.query.limit=10] - The maximum number of students to return per page.
- * @param {number} [req.query.page=1] - The page number to retrieve.
- * @param {string} [req.query.sort='asc'] - The sort order for the results ('asc' or 'desc').
- * @param {boolean|string} [req.query.populate='false'] - Whether to include related Course data.
- * @param {boolean|string} [req.query.populate] - Whether to include related Course data.
- *
- * Response:
- * - 200: Returns a JSON object containing:
- *   - meta: { totalItems, page, totalPages }
- *   - data: Array of student objects
- * - 500: Returns an error message if the operation fails.
- *
- * @async
- * @function getAllStudents
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @returns {Promise<void>}
- */
-export const getAllStudents = async (req, res) => {
-    const limit = parseInt(req.query.limit) || 10;
-    const page = parseInt(req.query.page) || 1;
-    const sort = req.query.sort === 'desc' ? 'DESC' : 'ASC';
-    const populate = req.query.populate ? req.query.populate.toLowerCase() : '';
 
-    try {
-        const totalCount = await db.Student.count();
-        const students = await db.Student.findAll({
-            limit: limit,
-            offset: (page - 1) * limit,
-            order: [['id', sort]],
-            include: populate ? populate.split(',').map(model => {
-                if (model === 'course') return { model: db.Course };
-                return null;
-            }).filter(Boolean) : []
-        });
-        res.json({
-            meta: {
-                totalItems: totalCount,
-                page: page,
-                totalPages: Math.ceil(totalCount / limit),
-            },
-            data: students,
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+export const getAllStudents = async (req, res) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+
+    const students = await db.Student.findAndCountAll({
+      limit,
+      offset: (page - 1) * limit,
+      include: [{ model: db.Course }],
+    });
+
+    res.json({
+      data: students.rows,
+      meta: {
+        totalItems: students.count,  // <-- add this
+        page,
+        totalPages: Math.ceil(students.count / limit),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
+
+
 
 /**
  * @swagger

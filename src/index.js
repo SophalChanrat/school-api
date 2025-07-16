@@ -4,18 +4,28 @@ import studentRoutes from './routes/student.routes.js';
 import courseRoutes from './routes/course.routes.js';
 import teacherRoutes from './routes/teacher.routes.js';
 import { serveSwagger, setupSwagger } from './config/swagger.js';
-
+import jwt from 'jsonwebtoken';
+import authRouter from './routes/auth.routes.js';
+import { authenticateToken } from './controllers/auth.controller.js';
+import cors from 'cors';
 dotenv.config();
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 app.use(express.json());
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true
+}));
 
 app.use('/docs', serveSwagger, setupSwagger);
+app.use('/auth', authRouter);
 
-app.use('/students', studentRoutes);
-app.use('/courses', courseRoutes);
-app.use('/teachers', teacherRoutes);
+
+app.use('/students', authenticateToken, studentRoutes);
+app.use('/courses' , authenticateToken, courseRoutes);
+app.use('/teachers', authenticateToken, teacherRoutes);
 
 app.get('/', (req, res) => res.send('Welcome to School API!'));
 
